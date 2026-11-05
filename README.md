@@ -44,12 +44,12 @@ Add two repository secrets under **Settings → Secrets and variables → Action
 
 | Secret | Value |
 | --- | --- |
-| `WRANGLER_CONFIG` | The complete Wrangler JSONC configuration. For multiple Workers, use an array of complete configurations. |
+| `WRANGLER_CONFIG` | One complete Wrangler JSONC configuration, including the deployment account ID. |
 | `CLOUDFLARE_API_TOKEN` | Your Cloudflare deployment API token. |
 
-Push to `main`, or run **Actions → Deploy → Run workflow**. Each configuration's `name` determines the deployed Worker; different configurations can use different domains, Tunnels, and backend ports.
+Push source, dependency, build-configuration, or deployment-workflow changes to `main`, or run **Actions → Deploy → Run workflow**. Documentation-only changes do not trigger deployment. The configuration's `name` determines the deployed Worker.
 
-See [configuration examples and deployment details](docs/configuration.md), including multiple deployments and additional generated hostnames. Keep real configurations and credentials out of Git.
+See [configuration examples and deployment details](docs/configuration.md), including custom domains and additional generated hostnames. Keep real configurations and credentials out of Git.
 
 ## Local development
 

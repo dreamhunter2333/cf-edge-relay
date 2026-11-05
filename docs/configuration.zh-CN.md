@@ -244,86 +244,21 @@ pnpm run dev --config wrangler.local.jsonc
 
 提交的示例只包含虚构地址和 UUID。部署凭据使用 Wrangler 登录或 CI secrets 提供；真实账号 ID、Tunnel ID、域名和源站地址只填写在已忽略的 `*.local.jsonc` / `*.local.toml` 文件中。代理运行时不需要部署凭据。
 
-## GitHub Actions：单个或多个部署
+## GitHub Actions
 
-workflow 只读取两个仓库 Secret：`WRANGLER_CONFIG` 和 `CLOUDFLARE_API_TOKEN`。配置 Secret 接受本地 Wrangler 文件的完整 JSONC 对象，支持注释和尾随逗号。配置中填写 `account_id`，以便无交互选择部署账号。所有 `main` 路径相对于仓库根目录。
+添加两个仓库 Secret：`WRANGLER_CONFIG` 保存一份完整的 Wrangler JSONC 文件，包含 `account_id`；`CLOUDFLARE_API_TOKEN` 保存部署 Token。支持注释和尾随逗号，所有 `main` 路径相对于仓库根目录。
 
-部署多个 Worker 或不同后端端口时，在同一个 `WRANGLER_CONFIG` Secret 中保存完整配置组成的数组。例如：
+workflow 把配置写入已忽略的临时文件，然后执行：
 
-```json
-[
-  {
-    "name": "app-a",
-    "main": "src/proxy.ts",
-    "compatibility_date": "2026-11-05",
-    "workers_dev": true,
-    "vpc_networks": [
-      {
-        "binding": "PRIVATE_NET",
-        "tunnel_id": "00000000-0000-4000-8000-000000000001"
-      }
-    ],
-    "vars": {
-      "UPSTREAMS": {
-        "app": {
-          "url": "http://10.0.0.10:8080",
-          "binding": "PRIVATE_NET"
-        }
-      },
-      "ROUTES": [
-        {
-          "hosts": [
-            "app-a.YOUR_ACCOUNT_SUBDOMAIN.workers.dev"
-          ],
-          "pathPrefix": "/",
-          "upstreams": [
-            "app"
-          ]
-        }
-      ]
-    },
-    "account_id": "YOUR_ACCOUNT_ID"
-  },
-  {
-    "name": "app-b",
-    "main": "src/proxy.ts",
-    "compatibility_date": "2026-11-05",
-    "workers_dev": true,
-    "vpc_networks": [
-      {
-        "binding": "PRIVATE_NET",
-        "tunnel_id": "00000000-0000-4000-8000-000000000001"
-      }
-    ],
-    "vars": {
-      "UPSTREAMS": {
-        "app": {
-          "url": "http://10.0.0.10:9090",
-          "binding": "PRIVATE_NET"
-        }
-      },
-      "ROUTES": [
-        {
-          "hosts": [
-            "app-b.YOUR_ACCOUNT_SUBDOMAIN.workers.dev"
-          ],
-          "pathPrefix": "/",
-          "upstreams": [
-            "app"
-          ]
-        }
-      ]
-    },
-    "account_id": "YOUR_ACCOUNT_ID"
-  }
-]
+```sh
+pnpm exec wrangler deploy --config wrangler.ci.local.jsonc
 ```
 
-每份配置用同一套 TypeScript 代理源码创建或更新一个 Worker，`name` 必须各不相同。按数组顺序依次部署；使用 service binding 薄入口时，先部署共用代理，再部署入口。失败后停止后续部署。
+配置的 `name` 决定部署哪个 Worker。在同一个文件的 `UPSTREAMS` 和 `ROUTES` 中配置多个后端端口，不再使用单独的部署脚本。
 
-Token 需具有 Workers Scripts Edit 以及对应 binding 所需权限；直接绑定 VPC Tunnel 需要 Connectivity Directory Admin。使用自定义域名时还需相应账号／区域权限。Token 到期后更新对应 Secret。
+Token 需具有 Workers Scripts Edit 以及对应 binding 所需权限；直接绑定 VPC Tunnel 需要 Connectivity Directory Admin。使用自定义域名时还需相应账号／区域权限。
 
-Push 到 `main` 或手动运行时，workflow 安装锁定的 pnpm 依赖、检查 TypeScript，再部署配置。私有配置只写入临时的、被 Git 忽略的本地文件，完成后删除；Actions 日志会屏蔽配置中的字符串值。
+仅 `main` 上的 `src/`、依赖清单／锁文件、TypeScript 配置和部署 workflow 变更触发自动部署。只修改 README、`docs/`、许可证或示例模板不会触发，也可以手动运行。临时配置完成后删除，Actions 日志会屏蔽敏感配置字符串。
 
 ## 许可证
 

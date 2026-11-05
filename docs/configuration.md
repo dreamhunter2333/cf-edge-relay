@@ -244,86 +244,21 @@ Private VPC access during local development requires remote bindings or remote d
 
 Committed examples contain fictional addresses and UUIDs. Keep deployment credentials in Wrangler authentication or CI secrets, and put real account IDs, Tunnel IDs, domains, and origin addresses only in ignored `*.local.jsonc` / `*.local.toml` files. No deployment credentials are needed by the proxy at runtime.
 
-## GitHub Actions: one or multiple deployments
+## GitHub Actions
 
-The workflow reads exactly two repository secrets: `WRANGLER_CONFIG` and `CLOUDFLARE_API_TOKEN`. The configuration secret accepts the complete JSONC object from a local Wrangler file, including comments and trailing commas. Include `account_id` to select the deployment account without interaction. All `main` paths are relative to the repository root.
+Add two repository secrets: `WRANGLER_CONFIG` contains one complete Wrangler JSONC file, including `account_id`; `CLOUDFLARE_API_TOKEN` contains the deployment token. Comments and trailing commas are supported. All `main` paths are relative to the repository root.
 
-To deploy multiple Workers or backend ports, put an array of complete configurations into the same `WRANGLER_CONFIG` secret. For example:
+The workflow writes that configuration to an ignored temporary file and runs:
 
-```json
-[
-  {
-    "name": "app-a",
-    "main": "src/proxy.ts",
-    "compatibility_date": "2026-11-05",
-    "workers_dev": true,
-    "vpc_networks": [
-      {
-        "binding": "PRIVATE_NET",
-        "tunnel_id": "00000000-0000-4000-8000-000000000001"
-      }
-    ],
-    "vars": {
-      "UPSTREAMS": {
-        "app": {
-          "url": "http://10.0.0.10:8080",
-          "binding": "PRIVATE_NET"
-        }
-      },
-      "ROUTES": [
-        {
-          "hosts": [
-            "app-a.YOUR_ACCOUNT_SUBDOMAIN.workers.dev"
-          ],
-          "pathPrefix": "/",
-          "upstreams": [
-            "app"
-          ]
-        }
-      ]
-    },
-    "account_id": "YOUR_ACCOUNT_ID"
-  },
-  {
-    "name": "app-b",
-    "main": "src/proxy.ts",
-    "compatibility_date": "2026-11-05",
-    "workers_dev": true,
-    "vpc_networks": [
-      {
-        "binding": "PRIVATE_NET",
-        "tunnel_id": "00000000-0000-4000-8000-000000000001"
-      }
-    ],
-    "vars": {
-      "UPSTREAMS": {
-        "app": {
-          "url": "http://10.0.0.10:9090",
-          "binding": "PRIVATE_NET"
-        }
-      },
-      "ROUTES": [
-        {
-          "hosts": [
-            "app-b.YOUR_ACCOUNT_SUBDOMAIN.workers.dev"
-          ],
-          "pathPrefix": "/",
-          "upstreams": [
-            "app"
-          ]
-        }
-      ]
-    },
-    "account_id": "YOUR_ACCOUNT_ID"
-  }
-]
+```sh
+pnpm exec wrangler deploy --config wrangler.ci.local.jsonc
 ```
 
-Each configuration creates or updates its own Worker using the same TypeScript proxy source. Worker names must be unique. Configurations deploy in array order; when using service-bound thin entries, deploy the shared proxy before its entries. An error stops subsequent deployments.
+The configuration's `name` selects the Worker. Configure multiple backend ports through `UPSTREAMS` and `ROUTES` in the same file. No separate deployment script is used.
 
-Use a token with Workers Scripts Edit and the permissions required by your bindings. Direct VPC Tunnel bindings require Connectivity Directory Admin. Custom domains additionally require their relevant account/zone permissions. Renew the token secret when it expires.
+Use a token with Workers Scripts Edit and the permissions required by your bindings. Direct VPC Tunnel bindings require Connectivity Directory Admin. Custom domains additionally require their relevant account/zone permissions.
 
-The workflow runs on pushes to `main` and manual dispatches. It installs locked pnpm dependencies, checks TypeScript, and deploys the configurations. Private configuration is written to temporary ignored local files and removed afterward; configuration string values are masked in Actions logs.
+Automatic deployment runs on changes to `src/`, dependency manifests/locks, TypeScript configuration, or the deployment workflow itself on `main`. README, `docs/`, license, and example-template changes alone do not trigger it. Manual dispatch remains available. The temporary configuration is removed afterward, and sensitive configuration strings are masked in Actions logs.
 
 ## License
 

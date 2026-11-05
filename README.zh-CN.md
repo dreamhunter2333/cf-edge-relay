@@ -44,12 +44,12 @@ pnpm run deploy --config wrangler.local.jsonc
 
 | Secret | 内容 |
 | --- | --- |
-| `WRANGLER_CONFIG` | 完整的 Wrangler JSONC 配置；多个 Worker 使用完整配置组成的数组。 |
+| `WRANGLER_CONFIG` | 一份完整的 Wrangler JSONC 配置，包含部署账号 ID。 |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare 部署 Token。 |
 
-Push 到 `main`，或在 **Actions → Deploy → Run workflow** 手动执行。每份配置的 `name` 决定部署哪个 Worker；不同配置可以使用不同域名、Tunnel 和后端端口。
+源码、依赖、构建配置或部署 workflow 的变更 push 到 `main` 时自动部署；仅修改文档不会触发。也可在 **Actions → Deploy → Run workflow** 手动执行。配置中的 `name` 决定部署哪个 Worker。
 
-多份部署配置、更多自动域名及其他细节见[配置文档](docs/configuration.zh-CN.md)。真实配置和凭据不要提交到 Git。
+自定义域名、更多自动域名及其他细节见[配置文档](docs/configuration.zh-CN.md)。真实配置和凭据不要提交到 Git。
 
 ## 本地开发
 
