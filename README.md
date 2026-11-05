@@ -38,7 +38,7 @@ Add two repository secrets under **Settings → Secrets and variables → Action
 
 | Secret | Value |
 | --- | --- |
-| `WRANGLER_CONFIG` | Your complete Wrangler JSONC configuration, including `account_id`. |
+| `WRANGLER_CONFIG` | Your complete Wrangler JSONC configuration. |
 | `CLOUDFLARE_API_TOKEN` | Your Cloudflare deployment API token. |
 
 Source, dependency, build-configuration, and deployment-workflow changes pushed to `main` trigger deployment. Documentation-only changes do not. You can also use **Actions → Deploy → Run workflow**.

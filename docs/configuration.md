@@ -1,4 +1,4 @@
-# Deployment details
+# Advanced deployment
 
 **English** | [简体中文](configuration.zh-CN.md) · [Usage](../README.md)
 
@@ -20,7 +20,7 @@ Request methods, authentication headers, cookies, and bodies pass through. Respo
 
 ## GitHub Actions
 
-Store one complete JSONC configuration as `WRANGLER_CONFIG` and the token separately as `CLOUDFLARE_API_TOKEN`. Include `account_id` for non-interactive deployment. The source path is relative to the repository root:
+Store the complete JSONC configuration as `WRANGLER_CONFIG` and the token separately as `CLOUDFLARE_API_TOKEN`. The source path is relative to the repository root:
 
 ```json
 {
@@ -36,8 +36,7 @@ Store one complete JSONC configuration as `WRANGLER_CONFIG` and the token separa
   ],
   "vars": {
     "TARGET_URL": "http://10.0.0.10:8080"
-  },
-  "account_id": "YOUR_ACCOUNT_ID"
+  }
 }
 ```
 
@@ -45,13 +44,42 @@ Replace the example identifiers and address with your own values. Never commit t
 
 The token needs **Workers Scripts Edit** and **Connectivity Directory Admin** for the direct Tunnel binding. **Cloudflare Tunnel Read** allows inspecting the selected Tunnel. Keep the token scoped to the deployment account.
 
-The workflow writes an ignored temporary configuration and runs one command:
+Each deployment writes an ignored temporary `wrangler.jsonc` and runs:
 
 ```sh
 pnpm exec wrangler deploy
 ```
 
-Pushes to `main` trigger deployment only when source, dependencies, TypeScript configuration, or the workflow changes. README, `docs/`, license, and example-template changes alone do not trigger deployment. Manual dispatch remains available. The configuration is removed after deployment and sensitive values are masked in logs.
+Pushes to `main` trigger deployment only when source, dependencies, TypeScript configuration, or the workflow changes. README, `docs/`, license, and example-template changes alone do not trigger deployment. Manual dispatch remains available.
+
+## Multiple services and tokens
+
+Use the same workflow and source for every service. Each configuration deploys a separate Worker with one target. Give Workers in the same account different `name` values; each configuration can use its own target address, port, and Tunnel.
+
+Add repository secrets in pairs with matching suffixes:
+
+| Configuration secret | Token secret |
+| --- | --- |
+| `WRANGLER_CONFIG` | `CLOUDFLARE_API_TOKEN` |
+| `WRANGLER_CONFIG_MAXX` | `CLOUDFLARE_API_TOKEN_MAXX` |
+| `WRANGLER_CONFIG_API` | `CLOUDFLARE_API_TOKEN_API` |
+
+Every configuration secret contains a complete JSONC document. Each token must have permission to deploy its paired configuration. Tokens can be reused across pairs when their permissions allow it.
+
+The workflow has one job with two deployment steps:
+
+1. Deploy the unsuffixed configuration if present.
+2. Discover `WRANGLER_CONFIG_*` secrets and deploy each with its matching `CLOUDFLARE_API_TOKEN_*`.
+
+Both steps use inline shell and deploy sequentially. The unsuffixed pair is optional, so only suffixed pairs also work. Missing tokens, empty suffixed configurations, or failed deployments stop the workflow; earlier successful deployments remain in place. Token secrets without a matching configuration are ignored.
+
+To add a service, add a pair of secrets and run **Actions → Deploy → Run workflow**. No workflow or source change is needed. Editing secrets does not trigger deployment automatically. Removing a pair stops future deployment of that service; it does not delete its existing Worker.
+
+## Deployment logs
+
+Wrangler's stdout and stderr are discarded; the workflow reports only deployment success or failure, with suffixes identifying suffixed deployments. Wrangler disk logs and telemetry are disabled. Shell tracing is not enabled, and raw deployment logs are not uploaded as artifacts.
+
+Configuration files are created with owner-only permissions and removed when the step exits, with an additional cleanup step. A log level alone is not a confidentiality guarantee. Raw diagnostics are intentionally unavailable in public Actions logs; investigate failures in a trusted local environment.
 
 ## Troubleshooting
 

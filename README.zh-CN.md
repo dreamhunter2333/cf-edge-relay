@@ -38,7 +38,7 @@ pnpm run deploy
 
 | Secret | 内容 |
 | --- | --- |
-| `WRANGLER_CONFIG` | 完整的 Wrangler JSONC 配置，包含 `account_id`。 |
+| `WRANGLER_CONFIG` | 完整的 Wrangler JSONC 配置。 |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare 部署 Token。 |
 
 源码、依赖、构建配置或部署 workflow 的变更 push 到 `main` 时自动部署；只修改文档不会触发。也可在 **Actions → Deploy → Run workflow** 手动执行。
