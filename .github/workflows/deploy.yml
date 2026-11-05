@@ -57,41 +57,50 @@ jobs:
             exit 1
           fi
           printf '%s\n' 'Default deployment succeeded'
-      - name: Deploy suffixed configurations
+      - name: Deploy additional configurations
         shell: sh
         env:
-          DEPLOY_SECRETS: ${{ toJSON(secrets) }}
+          WRANGLER_CONFIGS: ${{ secrets.WRANGLER_CONFIGS }}
+          CLOUDFLARE_API_TOKENS: ${{ secrets.CLOUDFLARE_API_TOKENS }}
         run: |
           set -eu
+          [ -n "$WRANGLER_CONFIGS" ] || exit 0
+          keys=$(printf '%s' "$WRANGLER_CONFIGS" |
+            jq -r 'if type == "object" then keys[] else error("Expected a configuration object") end')
+          [ -n "$keys" ] || exit 0
+          : "${CLOUDFLARE_API_TOKENS:?Missing deployment tokens}"
+
           umask 077
           trap 'rm -f wrangler.jsonc' EXIT
 
-          keys=$(printf '%s' "$DEPLOY_SECRETS" |
-            jq -r 'keys[] | select(test("^WRANGLER_CONFIG_.+$"))')
-          [ -n "$keys" ] || exit 0
+          printf '%s\n' "$keys" | while IFS= read -r service; do
+            case "$service" in
+              ''|*[!A-Za-z0-9_-]*)
+                printf '%s\n' '::error::Invalid service name'
+                exit 1
+                ;;
+            esac
 
-          printf '%s\n' "$keys" | while IFS= read -r key; do
-            suffix="${key#WRANGLER_CONFIG_}"
-            if ! CLOUDFLARE_API_TOKEN=$(printf '%s' "$DEPLOY_SECRETS" |
-              jq -er --arg key "CLOUDFLARE_API_TOKEN_$suffix" \
-                '.[$key] | select(length > 0)'); then
-              printf '::error::Missing deployment token (%s)\n' "$suffix"
+            if ! CLOUDFLARE_API_TOKEN=$(printf '%s' "$CLOUDFLARE_API_TOKENS" |
+              jq -er --arg key "$service" \
+                '.[$key] | select(type == "string" and length > 0)') || [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+              printf '::error::Missing deployment token (%s)\n' "$service"
               exit 1
             fi
             export CLOUDFLARE_API_TOKEN
 
-            if ! printf '%s' "$DEPLOY_SECRETS" |
-              jq -er --arg key "$key" \
-                '.[$key] | select(length > 0)' > wrangler.jsonc; then
-              printf '::error::Empty deployment configuration (%s)\n' "$suffix"
+            if ! printf '%s' "$WRANGLER_CONFIGS" |
+              jq -er --arg key "$service" \
+                '.[$key] | if type == "object" then tojson elif type == "string" then select(length > 0) else empty end' > wrangler.jsonc; then
+              printf '::error::Invalid deployment configuration (%s)\n' "$service"
               exit 1
             fi
 
-            if ! (unset DEPLOY_SECRETS; pnpm exec wrangler deploy) >/dev/null 2>&1; then
-              printf '::error::Deployment failed (%s)\n' "$suffix"
+            if ! (unset WRANGLER_CONFIGS CLOUDFLARE_API_TOKENS; pnpm exec wrangler deploy) >/dev/null 2>&1; then
+              printf '::error::Deployment failed (%s)\n' "$service"
               exit 1
             fi
-            printf 'Deployment succeeded (%s)\n' "$suffix"
+            printf 'Deployment succeeded (%s)\n' "$service"
           done
       - name: Remove deployment configuration
         if: always()

@@ -54,30 +54,54 @@ Pushes to `main` trigger deployment only when source, dependencies, TypeScript c
 
 ## Multiple services and tokens
 
-Use the same workflow and source for every service. Each configuration deploys a separate Worker with one target. Give Workers in the same account different `name` values; each configuration can use its own target address, port, and Tunnel.
+Every configuration deploys one Worker with one target. Add two optional repository secrets for additional services:
 
-Add repository secrets in pairs with matching suffixes:
-
-| Configuration secret | Token secret |
+| Secret | Value |
 | --- | --- |
-| `WRANGLER_CONFIG` | `CLOUDFLARE_API_TOKEN` |
-| `WRANGLER_CONFIG_MAXX` | `CLOUDFLARE_API_TOKEN_MAXX` |
-| `WRANGLER_CONFIG_API` | `CLOUDFLARE_API_TOKEN_API` |
+| `WRANGLER_CONFIGS` | A JSON object mapping service names to complete Wrangler configurations. |
+| `CLOUDFLARE_API_TOKENS` | A JSON object mapping the same service names to deployment tokens. |
 
-Every configuration secret contains a complete JSONC document. Each token must have permission to deploy its paired configuration. Tokens can be reused across pairs when their permissions allow it.
+For example, `WRANGLER_CONFIGS`:
 
-The workflow has one job with two deployment steps:
+```json
+{
+  "api": {
+    "name": "api",
+    "main": "src/index.ts",
+    "compatibility_date": "2026-11-05",
+    "workers_dev": true,
+    "vpc_networks": [
+      {
+        "binding": "TUNNEL",
+        "tunnel_id": "00000000-0000-4000-8000-000000000001"
+      }
+    ],
+    "vars": {
+      "TARGET_URL": "http://10.0.0.10:8080"
+    }
+  }
+}
+```
 
-1. Deploy the unsuffixed configuration if present.
-2. Discover `WRANGLER_CONFIG_*` secrets and deploy each with its matching `CLOUDFLARE_API_TOKEN_*`.
+And `CLOUDFLARE_API_TOKENS`:
 
-Both steps use inline shell and deploy sequentially. The unsuffixed pair is optional, so only suffixed pairs also work. Missing tokens, empty suffixed configurations, or failed deployments stop the workflow; earlier successful deployments remain in place. Token secrets without a matching configuration are ignored.
+```json
+{
+  "api": "YOUR_CLOUDFLARE_API_TOKEN"
+}
+```
 
-To add a service, add a pair of secrets and run **Actions → Deploy → Run workflow**. No workflow or source change is needed. Editing secrets does not trigger deployment automatically. Removing a pair stops future deployment of that service; it does not delete its existing Worker.
+Add more entries under matching names such as `web` or `api2`. Service names may contain letters, digits, underscores, and hyphens. Give Workers in the same account different `name` values; each configuration can use its own target address, port, and Tunnel. Tokens may be reused when their permissions allow it.
+
+Configurations can be JSON objects, as above, or JSON strings containing complete JSONC text when comments or trailing commas are needed. No real configurations or tokens belong in Git.
+
+One job runs two inline shell deployment steps: the optional default pair (`WRANGLER_CONFIG` and `CLOUDFLARE_API_TOKEN`) first, then entries from the two collections. It explicitly reads only these four named secrets. Missing tokens, invalid configurations, or failed deployments stop the workflow; earlier successful deployments remain in place. Tokens without matching configurations are ignored.
+
+To add a service, update the two collections and run **Actions → Deploy → Run workflow**. No workflow or source change is needed. Editing secrets does not automatically trigger deployment. Removing an entry stops future deployment of that service; it does not delete its existing Worker.
 
 ## Deployment logs
 
-Wrangler's stdout and stderr are discarded; the workflow reports only deployment success or failure, with suffixes identifying suffixed deployments. Wrangler disk logs and telemetry are disabled. Shell tracing is not enabled, and raw deployment logs are not uploaded as artifacts.
+Wrangler's stdout and stderr are discarded; the workflow reports only deployment success or failure, with service names identifying additional deployments. Wrangler disk logs and telemetry are disabled. Shell tracing is not enabled, and raw deployment logs are not uploaded as artifacts.
 
 Configuration files are created with owner-only permissions and removed when the step exits, with an additional cleanup step. A log level alone is not a confidentiality guarantee. Raw diagnostics are intentionally unavailable in public Actions logs; investigate failures in a trusted local environment.
 

@@ -54,30 +54,54 @@ Push 到 `main` 时，仅源码、依赖、TypeScript 配置或 workflow 变更�
 
 ## 多个服务与 Token
 
-所有服务共用一个 workflow 和同一份源码，每份配置部署一个独立 Worker，只代理一个目标。同一账号下的 Worker 使用不同的 `name`，各自配置目标地址、端口和 Tunnel。
+每份配置部署一个 Worker，只代理一个目标。多服务部署额外添加两个可选的仓库 Secret：
 
-在仓库中添加后缀匹配的 Secret 配对：
-
-| 配置 Secret | Token Secret |
+| Secret | 内容 |
 | --- | --- |
-| `WRANGLER_CONFIG` | `CLOUDFLARE_API_TOKEN` |
-| `WRANGLER_CONFIG_MAXX` | `CLOUDFLARE_API_TOKEN_MAXX` |
-| `WRANGLER_CONFIG_API` | `CLOUDFLARE_API_TOKEN_API` |
+| `WRANGLER_CONFIGS` | JSON 对象，按服务名保存完整 Wrangler 配置。 |
+| `CLOUDFLARE_API_TOKENS` | JSON 对象，按相同服务名保存部署 Token。 |
 
-每个配置 Secret 都保存完整 JSONC，Token 必须有权限部署与其配对的配置。权限允许时，不同配对也可以使用相同 Token。
+例如，`WRANGLER_CONFIGS`：
 
-workflow 只有一个 Job，部署分成两个步骤：
+```json
+{
+  "api": {
+    "name": "api",
+    "main": "src/index.ts",
+    "compatibility_date": "2026-11-05",
+    "workers_dev": true,
+    "vpc_networks": [
+      {
+        "binding": "TUNNEL",
+        "tunnel_id": "00000000-0000-4000-8000-000000000001"
+      }
+    ],
+    "vars": {
+      "TARGET_URL": "http://10.0.0.10:8080"
+    }
+  }
+}
+```
 
-1. 存在无后缀配置时，先部署默认配置。
-2. 自动发现 `WRANGLER_CONFIG_*`，分别使用同后缀的 `CLOUDFLARE_API_TOKEN_*` 部署。
+对应的 `CLOUDFLARE_API_TOKENS`：
 
-两个步骤都使用 inline shell，按顺序部署。无后缀配对可选，因此也支持只配置后缀配对。缺少 Token、后缀配置为空或部署失败时停止 workflow，之前成功的部署会保留。没有对应配置的 Token Secret 会被忽略。
+```json
+{
+  "api": "YOUR_CLOUDFLARE_API_TOKEN"
+}
+```
 
-新增服务时，添加一对 Secret，再运行 **Actions → Deploy → Run workflow**，无需修改 workflow 或源码。修改 Secret 不会自动触发部署。删除配对只会停止后续部署，不会删除已存在的 Worker。
+需要更多服务时，增加 `web`、`api2` 等同名条目。服务名只使用字母、数字、下划线和连字符。同一账号下的 Worker 使用不同的 `name`，各自配置目标地址、端口和 Tunnel；权限允许时可以复用 Token。
+
+配置值可以是上述 JSON 对象；需要保留注释或尾随逗号时，也可以使用包含完整 JSONC 文本的 JSON 字符串。真实配置和 Token 不要提交到 Git。
+
+一个 Job 分两个 inline shell 步骤执行：先处理可选的默认配对（`WRANGLER_CONFIG` 和 `CLOUDFLARE_API_TOKEN`），再部署两个集合中的条目。只显式读取这四个指定 Secret。缺少 Token、配置无效或部署失败时停止 workflow，之前成功的部署会保留；没有对应配置的 Token 会被忽略。
+
+新增服务时，更新两个集合，再运行 **Actions → Deploy → Run workflow**，无需修改 workflow 或源码。修改 Secret 不会自动触发部署。删除条目只会停止后续部署，不会删除已存在的 Worker。
 
 ## 部署日志
 
-Wrangler 的标准输出和错误输出不进入 Actions 日志，workflow 只显示部署成功或失败，后缀部署使用后缀标识对应服务。关闭 Wrangler 磁盘日志和遥测，不启用 shell 跟踪，也不上传原始部署日志。
+Wrangler 的标准输出和错误输出不进入 Actions 日志，workflow 只显示部署成功或失败，额外部署使用服务名标识对应服务。关闭 Wrangler 磁盘日志和遥测，不启用 shell 跟踪，也不上传原始部署日志。
 
 配置文件仅允许所有者读写，步骤退出时删除，并保留额外清理步骤。仅调整日志级别不能保证配置保密。公开 Actions 日志中不提供原始诊断信息，失败时应在可信本地环境排查。
 
