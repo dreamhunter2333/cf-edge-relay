@@ -1,0 +1,12 @@
+node_modules/
+.wrangler/
+dist/
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+*.local.jsonc
+*.local.toml
+*.local.json
+*.log
+.DS_Store
