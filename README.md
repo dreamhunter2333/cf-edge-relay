@@ -16,10 +16,10 @@ Requires Node.js 22+ and pnpm.
 ```sh
 pnpm install --frozen-lockfile
 pnpm exec wrangler login
-cp wrangler.jsonc.example wrangler.local.jsonc
+cp wrangler.jsonc.example wrangler.jsonc
 ```
 
-Edit `wrangler.local.jsonc`:
+Edit `wrangler.jsonc`:
 
 - Set `name` to the name you want in your generated public URL.
 - Set `vpc_networks[0].tunnel_id` to your Tunnel UUID. Keep the binding name `TUNNEL`.
@@ -27,7 +27,7 @@ Edit `wrangler.local.jsonc`:
 
 ```sh
 pnpm run check
-pnpm run deploy --config wrangler.local.jsonc
+pnpm run deploy
 ```
 
 Open `https://<name>.<account-subdomain>.workers.dev`. All requests go to the same target, preserving paths, query strings, request bodies, and streaming responses.
@@ -48,7 +48,7 @@ See [deployment details](docs/configuration.md) for Tunnel requirements, token p
 ## Local development
 
 ```sh
-pnpm run dev --config wrangler.local.jsonc
+pnpm run dev
 ```
 
 [MIT License](LICENSE).

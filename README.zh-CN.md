@@ -16,10 +16,10 @@ flowchart LR
 ```sh
 pnpm install --frozen-lockfile
 pnpm exec wrangler login
-cp wrangler.jsonc.example wrangler.local.jsonc
+cp wrangler.jsonc.example wrangler.jsonc
 ```
 
-编辑 `wrangler.local.jsonc`：
+编辑 `wrangler.jsonc`：
 
 - 用 `name` 设置自动生成的公网域名中的名称。
 - 将 `vpc_networks[0].tunnel_id` 设置为 Tunnel UUID，binding 名称保持 `TUNNEL`。
@@ -27,7 +27,7 @@ cp wrangler.jsonc.example wrangler.local.jsonc
 
 ```sh
 pnpm run check
-pnpm run deploy --config wrangler.local.jsonc
+pnpm run deploy
 ```
 
 访问 `https://<name>.<账号子域>.workers.dev`。所有请求都转发到同一个目标，保留路径、查询参数、请求体和流式响应。
@@ -48,7 +48,7 @@ Tunnel 要求、Token 权限及配置示例见[部署说明](docs/configuration.
 ## 本地开发
 
 ```sh
-pnpm run dev --config wrangler.local.jsonc
+pnpm run dev
 ```
 
 [MIT 许可证](LICENSE)。

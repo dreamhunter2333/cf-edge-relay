@@ -12,7 +12,7 @@ Workers VPC 要求 `cloudflared` 版本至少为 2025.7.0，并实际使用 QUIC
 
 ## 配置
 
-复制根目录[模板](../wrangler.jsonc.example)为 `wrangler.local.jsonc`。服务只设置 `vars.TARGET_URL`，Tunnel UUID 用于选择连接。不再配置域名／路径规则、出口池或入口 Worker。
+复制根目录[模板](../wrangler.jsonc.example)为 `wrangler.jsonc`。服务只设置 `vars.TARGET_URL`，Tunnel UUID 用于选择连接。不再配置域名／路径规则、出口池或入口 Worker。
 
 目标必须使用 HTTP(S)，不能包含 URL 用户名密码、查询参数或片段。可以带基础路径：例如目标 `http://10.0.0.10:8080/base` 收到请求 `/items?q=1` 时，会转发到 `/base/items?q=1`。
 
@@ -48,7 +48,7 @@ Token 需要 **Workers Scripts Edit**，以及直接绑定 Tunnel 所需的 **Co
 workflow 写入已忽略的临时配置后，只执行一条命令：
 
 ```sh
-pnpm exec wrangler deploy --config wrangler.ci.local.jsonc
+pnpm exec wrangler deploy
 ```
 
 Push 到 `main` 时，仅源码、依赖、TypeScript 配置或 workflow 变更会触发部署。只修改 README、`docs/`、许可证或示例模板不会触发，也可手动运行。部署后删除临时配置，日志中屏蔽敏感值。

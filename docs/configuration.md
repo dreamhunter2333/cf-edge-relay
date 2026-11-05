@@ -12,7 +12,7 @@ Workers VPC requires `cloudflared` 2025.7.0 or later and an active QUIC connecti
 
 ## Configuration
 
-Copy the root [template](../wrangler.jsonc.example) to `wrangler.local.jsonc`. The only service setting is `vars.TARGET_URL`; the Tunnel UUID selects the connection. There are no host/path rules, outbound pools, or entry Workers.
+Copy the root [template](../wrangler.jsonc.example) to `wrangler.jsonc`. The only service setting is `vars.TARGET_URL`; the Tunnel UUID selects the connection. There are no host/path rules, outbound pools, or entry Workers.
 
 Targets must use HTTP(S), without URL credentials, query strings, or fragments. An optional base path is prepended to incoming paths. For example, target `http://10.0.0.10:8080/base` and request `/items?q=1` forward to `/base/items?q=1`.
 
@@ -48,7 +48,7 @@ The token needs **Workers Scripts Edit** and **Connectivity Directory Admin** fo
 The workflow writes an ignored temporary configuration and runs one command:
 
 ```sh
-pnpm exec wrangler deploy --config wrangler.ci.local.jsonc
+pnpm exec wrangler deploy
 ```
 
 Pushes to `main` trigger deployment only when source, dependencies, TypeScript configuration, or the workflow changes. README, `docs/`, license, and example-template changes alone do not trigger deployment. Manual dispatch remains available. The configuration is removed after deployment and sensitive values are masked in logs.

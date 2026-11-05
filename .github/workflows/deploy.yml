@@ -52,13 +52,13 @@ jobs:
             mask(value);
             try { mask(new URL(value).hostname); } catch {}
           }
-          fs.writeFileSync('wrangler.ci.local.jsonc', config, { mode: 0o600, flag: 'wx' });
+          fs.writeFileSync('wrangler.jsonc', config, { mode: 0o600, flag: 'wx' });
           NODE
       - name: Deploy Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           WRANGLER_LOG: error
-        run: pnpm exec wrangler deploy --config wrangler.ci.local.jsonc
+        run: pnpm exec wrangler deploy
       - name: Remove deployment configuration
         if: always()
-        run: rm -f wrangler.ci.local.jsonc
+        run: rm -f wrangler.jsonc
