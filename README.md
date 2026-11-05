@@ -2,16 +2,14 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-Expose private HTTP services at a stable public URL without owning a domain. Use a generated `workers.dev` URL with Cloudflare Tunnel, or add custom domains and route them with the same configuration.
+Expose one private HTTP service at a stable `workers.dev` URL without owning a domain. If you already have a domain, use Cloudflare Tunnel's published application feature directly.
 
 ```mermaid
 flowchart LR
-  In["workers.dev / custom domains"] --> Proxy["cf-edge-relay"]
-  Proxy --> Tunnel["Cloudflare Tunnel"] --> Private["Private services"]
-  Proxy --> Public["Public services"]
+  URL["Your workers.dev URL"] --> Worker["cf-edge-relay"] --> Tunnel["Cloudflare Tunnel"] --> Target["Your service"]
 ```
 
-## Install
+## Usage
 
 Requires Node.js 22+ and pnpm.
 
@@ -21,22 +19,18 @@ pnpm exec wrangler login
 cp wrangler.jsonc.example wrangler.local.jsonc
 ```
 
-## Configure and deploy
-
 Edit `wrangler.local.jsonc`:
 
-- Set `name` to the Worker name you want in its generated URL.
-- Replace the example Tunnel UUID, account subdomain, and service address.
-- Set `vars.ROUTES` for inbound host/path rules and `vars.UPSTREAMS` for outbound targets.
+- Set `name` to the name you want in your generated public URL.
+- Set `vpc_networks[0].tunnel_id` to your Tunnel UUID. Keep the binding name `TUNNEL`.
+- Set `vars.TARGET_URL` to your service address, reachable from the `cloudflared` host or container.
 
 ```sh
 pnpm run check
 pnpm run deploy --config wrangler.local.jsonc
 ```
 
-Open `https://<name>.<account-subdomain>.workers.dev`.
-
-To keep that URL and add custom domains, use the [mixed-domain example](docs/configuration.md#generated-domain-plus-custom-domains).
+Open `https://<name>.<account-subdomain>.workers.dev`. All requests go to the same target, preserving paths, query strings, request bodies, and streaming responses.
 
 ## Automatic deployment
 
@@ -44,12 +38,12 @@ Add two repository secrets under **Settings → Secrets and variables → Action
 
 | Secret | Value |
 | --- | --- |
-| `WRANGLER_CONFIG` | One complete Wrangler JSONC configuration, including the deployment account ID. |
+| `WRANGLER_CONFIG` | Your complete Wrangler JSONC configuration, including `account_id`. |
 | `CLOUDFLARE_API_TOKEN` | Your Cloudflare deployment API token. |
 
-Push source, dependency, build-configuration, or deployment-workflow changes to `main`, or run **Actions → Deploy → Run workflow**. Documentation-only changes do not trigger deployment. The configuration's `name` determines the deployed Worker.
+Source, dependency, build-configuration, and deployment-workflow changes pushed to `main` trigger deployment. Documentation-only changes do not. You can also use **Actions → Deploy → Run workflow**.
 
-See [configuration examples and deployment details](docs/configuration.md), including custom domains and additional generated hostnames. Keep real configurations and credentials out of Git.
+See [deployment details](docs/configuration.md) for Tunnel requirements, token permissions, and configuration examples. Keep real configurations and credentials out of Git.
 
 ## Local development
 

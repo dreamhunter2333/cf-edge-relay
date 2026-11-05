@@ -1,28 +1,16 @@
 {
-  "name": "proxy",
-  "main": "src/proxy.ts",
+  "name": "my-service",
+  "main": "src/index.ts",
   "compatibility_date": "2026-11-05",
   "workers_dev": true,
   "vpc_networks": [
     {
-      "binding": "PRIVATE_NET",
+      "binding": "TUNNEL",
       // Replace this example UUID with your Tunnel UUID.
       "tunnel_id": "00000000-0000-4000-8000-000000000001"
     }
   ],
   "vars": {
-    "UPSTREAMS": {
-      "app": {
-        "url": "http://10.0.0.10:8080",
-        "binding": "PRIVATE_NET"
-      }
-    },
-    "ROUTES": [
-      {
-        "hosts": ["proxy.YOUR_ACCOUNT_SUBDOMAIN.workers.dev"],
-        "pathPrefix": "/",
-        "upstreams": ["app"]
-      }
-    ]
+    "TARGET_URL": "http://10.0.0.10:8080"
   }
 }
