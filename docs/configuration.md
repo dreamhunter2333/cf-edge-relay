@@ -14,9 +14,21 @@ Workers VPC requires `cloudflared` 2025.7.0 or later and an active QUIC connecti
 
 Copy the root [template](../wrangler.jsonc.example) to `wrangler.jsonc`. The only service setting is `vars.TARGET_URL`; the Tunnel UUID selects the connection. There are no host/path rules, outbound pools, or entry Workers.
 
-Targets must use HTTP(S), without URL credentials, query strings, or fragments. An optional base path is prepended to incoming paths. For example, target `http://10.0.0.10:8080/base` and request `/items?q=1` forward to `/base/items?q=1`.
+Use `http://`, `https://`, or `ssh://` without URL credentials, query strings, or fragments. HTTP(S) targets may include a base path. For example, target `http://10.0.0.10:8080/base` and request `/items?q=1` forward to `/base/items?q=1`.
 
 Request methods, authentication headers, cookies, and bodies pass through. Responses remain streaming, including SSE. WebSocket upgrades pass through the native Tunnel binding. Redirects to the target origin are rewritten to the public origin; cookies and page content are not rewritten. Requests are not retried automatically.
+
+## SSH
+
+Point the same `TUNNEL` binding at a Tunnel that can reach the SSH service and set `TARGET_URL` to the SSH address, for example `ssh://ssh.internal.example:22`. The port defaults to `22`. This Worker accepts binary WebSocket connections on `/ssh` and relays them to the configured SSH service. The WebSocket endpoint is public, and the VM's SSH server authenticates logins.
+
+Run the following command from the repository root. The proxy script uses Node.js's built-in WebSocket client, and `websocat -b` also works. Use your enrolled Google OS Login key and the corresponding Linux username, and replace the URL hostname with the deployed Worker hostname.
+
+```sh
+ssh -v -i ~/.ssh/google_compute_engine \
+  -o 'ProxyCommand node scripts/ssh-ws.mjs wss://my-service.example.workers.dev/ssh' \
+  OS_LOGIN_USERNAME@ssh-relay hostname
+```
 
 ## GitHub Actions
 

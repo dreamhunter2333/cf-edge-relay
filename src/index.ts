@@ -1,23 +1,38 @@
 import { proxy } from "hono/proxy";
+import { relaySsh } from "./ssh";
 
 interface Env {
   TARGET_URL: string;
-  TUNNEL: Pick<Fetcher, "fetch">;
+  TUNNEL: Pick<Fetcher, "fetch"> & {
+    connect(address: SocketAddress): Promise<Socket>;
+  };
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     let target: URL;
     try {
       target = new URL(env.TARGET_URL);
-      if (!["http:", "https:"].includes(target.protocol) ||
-          target.username || target.password || target.search || target.hash ||
-          typeof env.TUNNEL?.fetch !== "function") {
+      if (!target.hostname || target.username || target.password || target.search || target.hash) {
         return new Response("Invalid target or Tunnel configuration", { status: 500 });
       }
     } catch {
       return new Response("Invalid target or Tunnel configuration", { status: 500 });
     }
+
+    if (target.protocol === "ssh:") {
+      if ((target.pathname && target.pathname !== "/") ||
+          target.port === "0" || typeof env.TUNNEL?.connect !== "function") {
+        return new Response("Invalid target or Tunnel configuration", { status: 500 });
+      }
+      const address = { hostname: target.hostname, port: Number(target.port || 22) };
+      return relaySsh(request, ctx, () => env.TUNNEL.connect(address));
+    }
+
+    if (!["http:", "https:"].includes(target.protocol) || typeof env.TUNNEL?.fetch !== "function") {
+      return new Response("Invalid target or Tunnel configuration", { status: 500 });
+    }
+
     const incoming = new URL(request.url);
     const basePath = target.pathname.replace(/\/$/, "");
     target.pathname = basePath + incoming.pathname;

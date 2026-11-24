@@ -14,9 +14,21 @@ Workers VPC 要求 `cloudflared` 版本至少为 2025.7.0，并实际使用 QUIC
 
 复制根目录[模板](../wrangler.jsonc.example)为 `wrangler.jsonc`。服务只设置 `vars.TARGET_URL`，Tunnel UUID 用于选择连接。不再配置域名／路径规则、出口池或入口 Worker。
 
-目标必须使用 HTTP(S)，不能包含 URL 用户名密码、查询参数或片段。可以带基础路径：例如目标 `http://10.0.0.10:8080/base` 收到请求 `/items?q=1` 时，会转发到 `/base/items?q=1`。
+目标使用 `http://`、`https://` 或 `ssh://`，地址不能包含用户名密码、查询参数或片段。HTTP(S) 目标可带基础路径。例如目标 `http://10.0.0.10:8080/base` 收到请求 `/items?q=1` 时，会转发到 `/base/items?q=1`。
 
 请求方法、认证头、Cookie 和请求体透传。响应保持流式，包括 SSE；WebSocket 升级通过原生 Tunnel binding 透传。指向目标 origin 的重定向会改为公网 origin，Cookie 和页面内容不改写。不自动重试请求。
+
+## SSH
+
+将同一个 `TUNNEL` 绑定指向能访问 SSH 服务的 Tunnel，并将 `TARGET_URL` 设为实际地址，例如 `ssh://ssh.internal.example:22`。端口省略时使用 `22`。该 Worker 只接收 `/ssh` 的二进制 WebSocket 连接，并通过 Tunnel 转发到配置的 SSH 服务。公共入口可被访问，登录由 VM 上的 SSH 服务验证。
+
+在仓库根目录运行以下命令验证连接。代理脚本使用 Node.js 内置的 WebSocket 客户端，也可以换成 `websocat -b`。使用已登记到 Google OS Login 的密钥和对应的 Linux 用户名，并填入实际 Worker 地址。
+
+```sh
+ssh -v -i ~/.ssh/google_compute_engine \
+  -o 'ProxyCommand node scripts/ssh-ws.mjs wss://my-service.example.workers.dev/ssh' \
+  OS_LOGIN_USERNAME@ssh-relay hostname
+```
 
 ## GitHub Actions
 

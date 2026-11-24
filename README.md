@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-Expose one private HTTP service at a stable `workers.dev` URL without owning a domain. If you already have a domain, use Cloudflare Tunnel's published application feature directly.
+Expose one private HTTP(S) or SSH service at a stable `workers.dev` URL without owning a domain. Each Worker proxies one target and selects the protocol from `TARGET_URL`.
 
 ```mermaid
 flowchart LR
@@ -30,7 +30,7 @@ pnpm run check
 pnpm run deploy
 ```
 
-Open `https://<name>.<account-subdomain>.workers.dev`. All requests go to the same target, preserving paths, query strings, request bodies, and streaming responses.
+In HTTP(S) mode, open `https://<name>.<account-subdomain>.workers.dev`. The relay preserves paths, query strings, request bodies, and streaming responses. In SSH mode, use the OpenSSH `ProxyCommand` to connect to `/ssh`. See the [SSH configuration](docs/configuration.md#ssh).
 
 ## Automatic deployment
 

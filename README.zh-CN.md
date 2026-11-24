@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-没有自有域名，也能通过固定的 `workers.dev` 地址访问一个内网 HTTP 服务。如果已有域名，直接使用 Cloudflare Tunnel 的发布应用功能即可。
+没有自有域名，也能通过固定的 `workers.dev` 地址访问一个内网 HTTP(S) 或 SSH 服务。每个 Worker 代理一个目标，协议由 `TARGET_URL` 决定。
 
 ```mermaid
 flowchart LR
@@ -30,7 +30,7 @@ pnpm run check
 pnpm run deploy
 ```
 
-访问 `https://<name>.<账号子域>.workers.dev`。所有请求都转发到同一个目标，保留路径、查询参数、请求体和流式响应。
+HTTP(S) 模式下，访问 `https://<name>.<账号子域>.workers.dev`。转发保留路径、查询参数、请求体和流式响应。SSH 模式下，通过 OpenSSH 的 `ProxyCommand` 连接 `/ssh`，见 [SSH 配置](docs/configuration.zh-CN.md#ssh)。
 
 ## 自动部署
 
