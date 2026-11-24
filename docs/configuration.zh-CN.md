@@ -1,28 +1,37 @@
-# 高级部署
+# 配置与部署
 
-[English](configuration.md) | **简体中文** · [使用方法](../README.zh-CN.md)
+[English](configuration.md) | **简体中文** · [快速开始](../README.zh-CN.md)
 
 ## Tunnel
 
-在账号中创建或复用一条具名 Cloudflare Tunnel，保证它可以访问目标服务即可，无需配置发布应用域名。
+创建或复用一条具名 Cloudflare Tunnel，通过 Tunnel UUID 直绑到 Worker。`cloudflared` 至少使用 2025.7.0，并通过 QUIC 连接 Cloudflare。防火墙需允许出站 UDP 7844。 [Cloudflare Tunnel 要求](https://developers.cloudflare.com/workers-vpc/configuration/tunnel/)
 
-Workers VPC 要求 `cloudflared` 版本至少为 2025.7.0，并实际使用 QUIC 连接。需允许出站 UDP 7844。参考 [Cloudflare Tunnel 文档](https://developers.cloudflare.com/workers-vpc/configuration/tunnel/)。
+目标地址从 `cloudflared` 所在的网络解析和连接。若 `cloudflared` 运行在容器内，`localhost` 指向该容器。
 
-`TARGET_URL` 从 `cloudflared` 一侧解析和连接。容器中的 `localhost` 指向容器自身，不是宿主机，应填写容器能访问的地址。
+## 配置变量
 
-## 配置
+复制仓库根目录的模板为 `wrangler.jsonc`。通过 Actions 部署时，将同样的配置放进相应的 Secret。 [配置模板](../wrangler.jsonc.example)
 
-复制根目录[模板](../wrangler.jsonc.example)为 `wrangler.jsonc`。服务只设置 `vars.TARGET_URL`，Tunnel UUID 用于选择连接。不再配置域名／路径规则、出口池或入口 Worker。
+| 配置项 | 类型 | 用途 |
+| --- | --- | --- |
+| `name` | 字符串 | Worker 名称，用于生成 `workers.dev` 地址。 |
+| `vpc_networks[0].tunnel_id` | UUID 字符串 | 直绑的 Tunnel ID，绑定名称为 `TUNNEL`。 |
+| `vars.TARGET_URL` | URL 字符串 | 单一目标，支持 `http://`、`https://` 和 `ssh://`。 |
+| `vars.ALLOWED_IPS` | 字符串数组，可选 | 来源 IP 白名单。示例 `["198.51.100.10", "203.0.113.0/24", "2001:db8::/32"]`。 |
 
-目标使用 `http://`、`https://` 或 `ssh://`，地址不能包含用户名密码、查询参数或片段。HTTP(S) 目标可带基础路径。例如目标 `http://10.0.0.10:8080/base` 收到请求 `/items?q=1` 时，会转发到 `/base/items?q=1`。
+`TARGET_URL` 不能包含用户名、密码、查询参数或片段。设置 `ALLOWED_IPS` 后，Hono 中间件会在 HTTP(S) 转发或 SSH 升级前检查 Cloudflare 的 `CF-Connecting-IP`。白名单接受单个 IPv4、IPv6 和 CIDR 网段。未设置时允许所有来源，空数组拒绝所有来源。
 
-请求方法、认证头、Cookie 和请求体透传。响应保持流式，包括 SSE；WebSocket 升级通过原生 Tunnel binding 透传。指向目标 origin 的重定向会改为公网 origin，Cookie 和页面内容不改写。不自动重试请求。
+## HTTP(S)
+
+直接浏览 Worker 的 HTTPS 地址。目标可带基础路径，例如 `http://10.0.0.10:8080/base` 会把 `/items?q=1` 转发到 `/base/items?q=1`。
+
+转发保留请求方法、认证头、Cookie 和请求体，支持流式响应、SSE 和 WebSocket 升级。指向目标 origin 的重定向改为 Worker 的公网 origin。Cookie 和页面内容保持原样，请求不自动重试。
 
 ## SSH
 
-将同一个 `TUNNEL` 绑定指向能访问 SSH 服务的 Tunnel，并将 `TARGET_URL` 设为实际地址，例如 `ssh://ssh.internal.example:22`。端口省略时使用 `22`。该 Worker 只接收 `/ssh` 的二进制 WebSocket 连接，并通过 Tunnel 转发到配置的 SSH 服务。公共入口可被访问，登录由 VM 上的 SSH 服务验证。
+将 `TARGET_URL` 设为 `ssh://ssh.internal.example:22` 一类的 SSH 地址。省略端口时使用 `22`。客户端通过 `/ssh` 建立二进制 WebSocket，目标 VM 验证 SSH 登录。
 
-在仓库根目录运行以下命令验证连接。代理脚本使用 Node.js 内置的 WebSocket 客户端，也可以换成 `websocat -b`。使用已登记到 Google OS Login 的密钥和对应的 Linux 用户名，并填入实际 Worker 地址。
+在仓库根目录运行连接测试。将域名、用户名和密钥路径换成实际值；下例使用 Google OS Login。代理脚本使用 Node.js 内置的 WebSocket 客户端，也支持换成 `websocat -b`。
 
 ```sh
 ssh -v -i ~/.ssh/google_compute_engine \
@@ -32,48 +41,22 @@ ssh -v -i ~/.ssh/google_compute_engine \
 
 ## GitHub Actions
 
-把完整 JSONC 配置存为 `WRANGLER_CONFIG`，部署 Token 单独存为 `CLOUDFLARE_API_TOKEN`。源码路径相对于仓库根目录：
+在仓库的 **Settings → Secrets and variables → Actions** 配置所需的 Secret。每份 Wrangler 配置部署一个 Worker，`main` 路径相对于仓库根目录。真实配置与 Token 存在 Secrets 中。
 
-```json
-{
-  "name": "my-service",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-11-05",
-  "workers_dev": true,
-  "vpc_networks": [
-    {
-      "binding": "TUNNEL",
-      "tunnel_id": "00000000-0000-4000-8000-000000000001"
-    }
-  ],
-  "vars": {
-    "TARGET_URL": "http://10.0.0.10:8080"
-  }
-}
-```
+| Secret | 内容 | 部署范围 |
+| --- | --- | --- |
+| `WRANGLER_CONFIG` | 完整 Wrangler JSONC 配置 | 默认 Worker |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare 部署 Token | 默认 Worker |
+| `WRANGLER_CONFIGS` | 服务名到完整 Wrangler 配置的 JSON 对象 | 其他 Worker |
+| `CLOUDFLARE_API_TOKENS` | 服务名到部署 Token 的 JSON 对象 | 其他 Worker |
 
-替换示例标识和地址，不要提交真实配置。JSONC Secret 支持注释和尾随逗号。
+Token 需要 **Workers Scripts Edit** 和直绑 Tunnel 所需的 **Connectivity Directory Admin**。需要查看 Tunnel 时再加 **Cloudflare Tunnel Read**。将权限范围限定到部署账号。
 
-Token 需要 **Workers Scripts Edit**，以及直接绑定 Tunnel 所需的 **Connectivity Directory Admin**。**Cloudflare Tunnel Read** 用于查看所选 Tunnel，权限范围限定到部署账号。
+### 多 Worker 配置
 
-每次部署写入已忽略的临时 `wrangler.jsonc` 后，执行：
+在两个 JSON Secret 中使用相同的服务名。服务名可包含字母、数字、下划线和连字符。同一账号下的 Worker 使用不同的 Wrangler `name`，各自配置目标、Tunnel 和可选白名单。权限允许时可以复用 Token。
 
-```sh
-pnpm exec wrangler deploy
-```
-
-Push 到 `main` 时，仅源码、依赖、TypeScript 配置或 workflow 变更会触发部署。只修改 README、`docs/`、许可证或示例模板不会触发，也可手动运行。
-
-## 多个服务与 Token
-
-每份配置部署一个 Worker，只代理一个目标。多服务部署额外添加两个可选的仓库 Secret：
-
-| Secret | 内容 |
-| --- | --- |
-| `WRANGLER_CONFIGS` | JSON 对象，按服务名保存完整 Wrangler 配置。 |
-| `CLOUDFLARE_API_TOKENS` | JSON 对象，按相同服务名保存部署 Token。 |
-
-例如，`WRANGLER_CONFIGS`：
+下面是 `WRANGLER_CONFIGS` 的示例值。
 
 ```json
 {
@@ -95,7 +78,7 @@ Push 到 `main` 时，仅源码、依赖、TypeScript 配置或 workflow 变更�
 }
 ```
 
-对应的 `CLOUDFLARE_API_TOKENS`：
+下面是配套的 `CLOUDFLARE_API_TOKENS` 值。
 
 ```json
 {
@@ -103,24 +86,23 @@ Push 到 `main` 时，仅源码、依赖、TypeScript 配置或 workflow 变更�
 }
 ```
 
-需要更多服务时，增加 `web`、`api2` 等同名条目。服务名只使用字母、数字、下划线和连字符。同一账号下的 Worker 使用不同的 `name`，各自配置目标地址、端口和 Tunnel；权限允许时可以复用 Token。
+配置条目也可使用包含完整 JSONC 文本的字符串，以保留注释或尾随逗号。默认配置直接接受 JSONC。
 
-配置值可以是上述 JSON 对象；需要保留注释或尾随逗号时，也可以使用包含完整 JSONC 文本的 JSON 字符串。真实配置和 Token 不要提交到 Git。
+### 触发与日志
 
-一个 Job 分两个 inline shell 步骤执行：先处理可选的默认配对（`WRANGLER_CONFIG` 和 `CLOUDFLARE_API_TOKEN`），再部署两个集合中的条目。只显式读取这四个指定 Secret。缺少 Token、配置无效或部署失败时停止 workflow，之前成功的部署会保留；没有对应配置的 Token 会被忽略。
+Actions 先检查 TypeScript，再部署默认 Worker 和 JSON 集合中的服务。缺少 Token、配置无效或部署失败时停止，已成功的部署会保留。只有 Token 而没有配置的条目会被忽略。删除条目后，该 Worker 停止参与后续部署，现有实例仍由 Cloudflare 保留。
 
-新增服务时，更新两个集合，再运行 **Actions → Deploy → Run workflow**，无需修改 workflow 或源码。修改 Secret 不会自动触发部署。删除条目只会停止后续部署，不会删除已存在的 Worker。
+源码、依赖、TypeScript 配置或 workflow 的相关改动推到 `main` 会触发部署。修改 Secret 后，在 **Actions → Deploy → Run workflow** 手动触发。
 
-## 部署日志
+每次部署写入仅所有者可读写的临时 `wrangler.jsonc`，调用 `pnpm exec wrangler deploy` 后清理。Actions 日志只记录部署结果，Wrangler 诊断输出、磁盘日志和遥测均关闭。需要诊断细节时，在可信本机环境运行 Wrangler。
 
-Wrangler 的标准输出和错误输出不进入 Actions 日志，workflow 只显示部署成功或失败，额外部署使用服务名标识对应服务。关闭 Wrangler 磁盘日志和遥测，不启用 shell 跟踪，也不上传原始部署日志。
+## 本地开发与排查
 
-配置文件仅允许所有者读写，步骤退出时删除，并保留额外清理步骤。仅调整日志级别不能保证配置保密。公开 Actions 日志中不提供原始诊断信息，失败时应在可信本地环境排查。
+运行 `pnpm run dev`。本地访问实际私网服务时，给 VPC 绑定设置 `remote: true`，或使用远程开发模式。 [VPC 配置](https://developers.cloudflare.com/workers-vpc/configuration/vpc-networks/)
 
-## 排查
-
-- `500`：检查 `TARGET_URL` 和 `TUNNEL` binding。
-- `502`：检查 Tunnel 状态、QUIC 连接，以及 `cloudflared` 能否访问目标。
-- 本地开发访问 VPC 私网需要远程 binding 或远程开发模式，参考 [VPC 配置](https://developers.cloudflare.com/workers-vpc/configuration/vpc-networks/)。
-
-身份认证由目标服务或 Cloudflare Access 承担，受 Cloudflare Workers 和 Workers VPC 平台限制。
+| 现象 | 检查项 |
+| --- | --- |
+| HTTP `403` | `ALLOWED_IPS` 是否涵盖客户端的公网出口 IP。 |
+| HTTP `426` | SSH 客户端是否用 WebSocket 升级请求访问 `/ssh`。 |
+| HTTP `500` | 检查 `TARGET_URL`、`TUNNEL` 绑定或 `ALLOWED_IPS` 格式。 |
+| HTTP `502` 或 SSH WebSocket 关闭码 `1011` | 检查 Tunnel 状态、QUIC 连接和目标服务是否可达。 |

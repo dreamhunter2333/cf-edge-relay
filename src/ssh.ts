@@ -3,7 +3,7 @@ const MAX_FRAME_BYTES = 64 * 1024;
 
 export function relaySsh(
   request: Request,
-  ctx: ExecutionContext,
+  ctx: Pick<ExecutionContext, "waitUntil">,
   connect: () => Promise<Socket>,
 ): Response {
   if (new URL(request.url).pathname !== "/ssh") {

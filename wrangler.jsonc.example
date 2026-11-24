@@ -11,6 +11,8 @@
     }
   ],
   "vars": {
+    // Optional IP addresses and CIDR ranges for both HTTP(S) and SSH.
+    // "ALLOWED_IPS": ["198.51.100.10", "203.0.113.0/24", "2001:db8::/32"],
     // Use a target such as ssh://ssh.internal.example:22 for SSH relay mode on /ssh.
     "TARGET_URL": "http://10.0.0.10:8080"
   }

@@ -1,28 +1,37 @@
-# Advanced deployment
+# Configuration and deployment
 
-**English** | [简体中文](configuration.zh-CN.md) · [Usage](../README.md)
+**English** | [简体中文](configuration.zh-CN.md) · [Quick start](../README.md)
 
 ## Tunnel
 
-Create or reuse a named Cloudflare Tunnel in your account. It only needs to reach the target service; a published application hostname is not required.
+Create or reuse a named Cloudflare Tunnel and bind it to the Worker by Tunnel UUID. Workers VPC requires `cloudflared` 2025.7.0 or later with an active QUIC connection. Allow outbound UDP port 7844. [Cloudflare Tunnel requirements](https://developers.cloudflare.com/workers-vpc/configuration/tunnel/)
 
-Workers VPC requires `cloudflared` 2025.7.0 or later and an active QUIC connection. Allow outbound UDP port 7844. See the [Cloudflare Tunnel guide](https://developers.cloudflare.com/workers-vpc/configuration/tunnel/).
+`cloudflared` resolves and connects to the target from its own network. If it runs in a container, `localhost` refers to that container.
 
-`TARGET_URL` is resolved and connected from the `cloudflared` side. For containers, `localhost` refers to that container, not its host. Use an address reachable from the container.
+## Worker configuration
 
-## Configuration
+Copy the repository template to `wrangler.jsonc`. For Actions deployments, store the same configuration in the corresponding Secret. [Configuration template](../wrangler.jsonc.example)
 
-Copy the root [template](../wrangler.jsonc.example) to `wrangler.jsonc`. The only service setting is `vars.TARGET_URL`; the Tunnel UUID selects the connection. There are no host/path rules, outbound pools, or entry Workers.
+| Key | Type | Purpose |
+| --- | --- | --- |
+| `name` | String | Worker name used in the generated `workers.dev` address. |
+| `vpc_networks[0].tunnel_id` | UUID string | Tunnel UUID for the direct binding named `TUNNEL`. |
+| `vars.TARGET_URL` | URL string | Single target using `http://`, `https://`, or `ssh://`. |
+| `vars.ALLOWED_IPS` | Optional array of strings | Source IP allowlist, for example `["198.51.100.10", "203.0.113.0/24", "2001:db8::/32"]`. |
 
-Use `http://`, `https://`, or `ssh://` without URL credentials, query strings, or fragments. HTTP(S) targets may include a base path. For example, target `http://10.0.0.10:8080/base` and request `/items?q=1` forward to `/base/items?q=1`.
+`TARGET_URL` accepts an address without credentials, a query string, or a fragment. When you set `ALLOWED_IPS`, Hono checks Cloudflare's `CF-Connecting-IP` before forwarding HTTP(S) or upgrading to SSH over WebSocket. The list accepts IPv4 and IPv6 addresses and CIDR ranges. Omitting the list allows all source addresses. An empty list denies all sources.
 
-Request methods, authentication headers, cookies, and bodies pass through. Responses remain streaming, including SSE. WebSocket upgrades pass through the native Tunnel binding. Redirects to the target origin are rewritten to the public origin; cookies and page content are not rewritten. Requests are not retried automatically.
+## HTTP(S)
+
+Open the Worker's HTTPS address. HTTP(S) targets may have a base path. For example, the target `http://10.0.0.10:8080/base` forwards `/items?q=1` to `/base/items?q=1`.
+
+The relay preserves request methods, authentication headers, cookies, bodies, streaming responses including SSE, and WebSocket upgrades. Redirects to the target origin use the Worker's public origin. Cookies and page content pass through unchanged. The relay makes one attempt per request.
 
 ## SSH
 
-Point the same `TUNNEL` binding at a Tunnel that can reach the SSH service and set `TARGET_URL` to the SSH address, for example `ssh://ssh.internal.example:22`. The port defaults to `22`. This Worker accepts binary WebSocket connections on `/ssh` and relays them to the configured SSH service. The WebSocket endpoint is public, and the VM's SSH server authenticates logins.
+Set `TARGET_URL` to an SSH address such as `ssh://ssh.internal.example:22`. The port defaults to `22`. The client opens a binary WebSocket connection on `/ssh`, and the target VM authenticates the SSH login.
 
-Run the following command from the repository root. The proxy script uses Node.js's built-in WebSocket client, and `websocat -b` also works. Use your enrolled Google OS Login key and the corresponding Linux username, and replace the URL hostname with the deployed Worker hostname.
+Run the connection test from the repository root. Replace the URL hostname, Linux username, and key path with your own values. The example uses Google OS Login. The proxy script uses Node.js's built-in WebSocket client, and `websocat -b` also works.
 
 ```sh
 ssh -v -i ~/.ssh/google_compute_engine \
@@ -32,48 +41,22 @@ ssh -v -i ~/.ssh/google_compute_engine \
 
 ## GitHub Actions
 
-Store the complete JSONC configuration as `WRANGLER_CONFIG` and the token separately as `CLOUDFLARE_API_TOKEN`. The source path is relative to the repository root:
+Set the required repository secrets under **Settings → Secrets and variables → Actions**. Each Wrangler configuration deploys one Worker, and `main` is relative to the repository root. Store real configuration and tokens in Secrets.
 
-```json
-{
-  "name": "my-service",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-11-05",
-  "workers_dev": true,
-  "vpc_networks": [
-    {
-      "binding": "TUNNEL",
-      "tunnel_id": "00000000-0000-4000-8000-000000000001"
-    }
-  ],
-  "vars": {
-    "TARGET_URL": "http://10.0.0.10:8080"
-  }
-}
-```
+| Secret | Value | Deployment |
+| --- | --- | --- |
+| `WRANGLER_CONFIG` | Complete Wrangler JSONC configuration | Default Worker |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare deployment token | Default Worker |
+| `WRANGLER_CONFIGS` | JSON object mapping service names to complete Wrangler configurations | Additional Workers |
+| `CLOUDFLARE_API_TOKENS` | JSON object mapping service names to deployment tokens | Additional Workers |
 
-Replace the example identifiers and address with your own values. Never commit the real configuration. Comments and trailing commas are supported in the JSONC secret.
+The token needs **Workers Scripts Edit** and **Connectivity Directory Admin** for direct Tunnel binding. Add **Cloudflare Tunnel Read** if it needs to inspect the Tunnel. Scope the permissions to the deployment account.
 
-The token needs **Workers Scripts Edit** and **Connectivity Directory Admin** for the direct Tunnel binding. **Cloudflare Tunnel Read** allows inspecting the selected Tunnel. Keep the token scoped to the deployment account.
+### Multiple Workers
 
-Each deployment writes an ignored temporary `wrangler.jsonc` and runs:
+Use the same service name in both JSON secrets. Service names can contain letters, digits, underscores, and hyphens. Workers in the same account need distinct Wrangler `name` values. Each Worker can have its own target, Tunnel, and optional allowlist. Tokens can be reused where their permissions allow it.
 
-```sh
-pnpm exec wrangler deploy
-```
-
-Pushes to `main` trigger deployment only when source, dependencies, TypeScript configuration, or the workflow changes. README, `docs/`, license, and example-template changes alone do not trigger deployment. Manual dispatch remains available.
-
-## Multiple services and tokens
-
-Every configuration deploys one Worker with one target. Add two optional repository secrets for additional services:
-
-| Secret | Value |
-| --- | --- |
-| `WRANGLER_CONFIGS` | A JSON object mapping service names to complete Wrangler configurations. |
-| `CLOUDFLARE_API_TOKENS` | A JSON object mapping the same service names to deployment tokens. |
-
-For example, `WRANGLER_CONFIGS`:
+Example `WRANGLER_CONFIGS` value.
 
 ```json
 {
@@ -95,7 +78,7 @@ For example, `WRANGLER_CONFIGS`:
 }
 ```
 
-And `CLOUDFLARE_API_TOKENS`:
+Corresponding `CLOUDFLARE_API_TOKENS` value.
 
 ```json
 {
@@ -103,24 +86,23 @@ And `CLOUDFLARE_API_TOKENS`:
 }
 ```
 
-Add more entries under matching names such as `web` or `api2`. Service names may contain letters, digits, underscores, and hyphens. Give Workers in the same account different `name` values; each configuration can use its own target address, port, and Tunnel. Tokens may be reused when their permissions allow it.
+Configuration entries can also be strings containing complete JSONC text to preserve comments or trailing commas. The default configuration accepts JSONC directly.
 
-Configurations can be JSON objects, as above, or JSON strings containing complete JSONC text when comments or trailing commas are needed. No real configurations or tokens belong in Git.
+### Triggers and logs
 
-One job runs two inline shell deployment steps: the optional default pair (`WRANGLER_CONFIG` and `CLOUDFLARE_API_TOKEN`) first, then entries from the two collections. It explicitly reads only these four named secrets. Missing tokens, invalid configurations, or failed deployments stop the workflow; earlier successful deployments remain in place. Tokens without matching configurations are ignored.
+Actions checks TypeScript, deploys the optional default Worker, and then deploys the entries in the JSON collection. A missing token, invalid configuration, or deployment failure stops the workflow. Earlier successful deployments stay live. Actions ignores tokens with no matching configuration. Removing an entry excludes that Worker from future deployments and leaves the deployed Worker in Cloudflare.
 
-To add a service, update the two collections and run **Actions → Deploy → Run workflow**. No workflow or source change is needed. Editing secrets does not automatically trigger deployment. Removing an entry stops future deployment of that service; it does not delete its existing Worker.
+GitHub triggers deployment for pushes to `main` that change source, dependencies, TypeScript configuration, or the workflow. After editing Secrets, use **Actions → Deploy → Run workflow**.
 
-## Deployment logs
+Each deployment writes an owner-only temporary `wrangler.jsonc`, runs `pnpm exec wrangler deploy`, and removes the file. Actions reports deployment status. Wrangler diagnostics, disk logs, and telemetry are suppressed. Run Wrangler in a trusted local environment if you need the diagnostics.
 
-Wrangler's stdout and stderr are discarded; the workflow reports only deployment success or failure, with service names identifying additional deployments. Wrangler disk logs and telemetry are disabled. Shell tracing is not enabled, and raw deployment logs are not uploaded as artifacts.
+## Local development and troubleshooting
 
-Configuration files are created with owner-only permissions and removed when the step exits, with an additional cleanup step. A log level alone is not a confidentiality guarantee. Raw diagnostics are intentionally unavailable in public Actions logs; investigate failures in a trusted local environment.
+Run `pnpm run dev`. To reach a real private service locally, set `remote: true` on the VPC binding or use remote development. [VPC configuration](https://developers.cloudflare.com/workers-vpc/configuration/vpc-networks/)
 
-## Troubleshooting
-
-- `500`: check `TARGET_URL` and the `TUNNEL` binding.
-- `502`: check Tunnel health, QUIC connectivity, and whether `cloudflared` can reach the target.
-- Private VPC access during local development requires remote bindings or remote development; see [VPC configuration](https://developers.cloudflare.com/workers-vpc/configuration/vpc-networks/).
-
-Authentication remains with the target service or Cloudflare Access. Cloudflare Workers and Workers VPC platform limits apply.
+| Symptom | Check |
+| --- | --- |
+| HTTP `403` | Verify that `ALLOWED_IPS` includes the client's public egress address. |
+| HTTP `426` | Verify that the SSH client sends a WebSocket upgrade request to `/ssh`. |
+| HTTP `500` | Check `TARGET_URL`, the `TUNNEL` binding, and the format of `ALLOWED_IPS`. |
+| HTTP `502` or SSH WebSocket close code `1011` | Check Tunnel health, QUIC connectivity, and target reachability. |

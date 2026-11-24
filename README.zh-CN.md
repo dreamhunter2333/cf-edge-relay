@@ -9,9 +9,9 @@ flowchart LR
   URL["你的 workers.dev 域名"] --> Worker["cf-edge-relay"] --> Tunnel["Cloudflare Tunnel"] --> Target["你的服务"]
 ```
 
-## 使用
+## 快速开始
 
-需要 Node.js 22+ 和 pnpm。
+准备 Node.js 22+、pnpm 和一条能访问目标服务的 Cloudflare Tunnel。 [Tunnel 要求](docs/configuration.zh-CN.md#tunnel)
 
 ```sh
 pnpm install --frozen-lockfile
@@ -19,36 +19,23 @@ pnpm exec wrangler login
 cp wrangler.jsonc.example wrangler.jsonc
 ```
 
-编辑 `wrangler.jsonc`：
-
-- 用 `name` 设置自动生成的公网域名中的名称。
-- 将 `vpc_networks[0].tunnel_id` 设置为 Tunnel UUID，binding 名称保持 `TUNNEL`。
-- 将 `vars.TARGET_URL` 设置为目标服务地址，需能从 `cloudflared` 所在主机或容器访问。
+在 `wrangler.jsonc` 填入 Worker 名称、Tunnel UUID 和目标地址。需要限制访问来源时，填写 `vars.ALLOWED_IPS`。 [配置表](docs/configuration.zh-CN.md#配置变量)
 
 ```sh
 pnpm run check
 pnpm run deploy
 ```
 
-HTTP(S) 模式下，访问 `https://<name>.<账号子域>.workers.dev`。转发保留路径、查询参数、请求体和流式响应。SSH 模式下，通过 OpenSSH 的 `ProxyCommand` 连接 `/ssh`，见 [SSH 配置](docs/configuration.zh-CN.md#ssh)。
+## 连接方式
 
-## 自动部署
-
-在仓库 **Settings → Secrets and variables → Actions** 添加两个 Secret：
-
-| Secret | 内容 |
+| `TARGET_URL` 协议 | 客户端用法 |
 | --- | --- |
-| `WRANGLER_CONFIG` | 完整的 Wrangler JSONC 配置。 |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare 部署 Token。 |
+| `http://` 或 `https://` | 访问 `https://<name>.<账号子域>.workers.dev`。 [转发行为](docs/configuration.zh-CN.md#https) |
+| `ssh://` | 用 OpenSSH 的 `ProxyCommand` 连接 Worker 的 `/ssh`。 [SSH 示例](docs/configuration.zh-CN.md#ssh) |
 
-源码、依赖、构建配置或部署 workflow 的变更 push 到 `main` 时自动部署；只修改文档不会触发。也可在 **Actions → Deploy → Run workflow** 手动执行。
+## 部署与排查
 
-Tunnel 要求、Token 权限及配置示例见[部署说明](docs/configuration.zh-CN.md)。真实配置和凭据不要提交到 Git。
-
-## 本地开发
-
-```sh
-pnpm run dev
-```
+- [通过 GitHub Actions 部署一个或多个 Worker](docs/configuration.zh-CN.md#github-actions)
+- [本地开发与故障排查](docs/configuration.zh-CN.md#本地开发与排查)
 
 [MIT 许可证](LICENSE)。
