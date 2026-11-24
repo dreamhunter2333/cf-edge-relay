@@ -107,7 +107,7 @@ Add more entries under matching names such as `web` or `api2`. Service names may
 
 Configurations can be JSON objects, as above, or JSON strings containing complete JSONC text when comments or trailing commas are needed. No real configurations or tokens belong in Git.
 
-One job deploys the optional default configuration, the entries from the two collections, and then the optional standalone SSH configuration. For the standalone SSH deployment, store the complete Wrangler configuration in `WRANGLER_SSH_CONFIG` and the deployment token in `CLOUDFLARE_SSH_API_TOKEN`. The workflow stops on a missing token, an invalid configuration, or a failed deployment. Earlier successful deployments remain in place. Tokens without matching configurations are ignored.
+One job runs two inline shell deployment steps: the optional default pair (`WRANGLER_CONFIG` and `CLOUDFLARE_API_TOKEN`) first, then entries from the two collections. It explicitly reads only these four named secrets. Missing tokens, invalid configurations, or failed deployments stop the workflow; earlier successful deployments remain in place. Tokens without matching configurations are ignored.
 
 To add a service, update the two collections and run **Actions → Deploy → Run workflow**. No workflow or source change is needed. Editing secrets does not automatically trigger deployment. Removing an entry stops future deployment of that service; it does not delete its existing Worker.
 
