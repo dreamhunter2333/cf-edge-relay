@@ -107,7 +107,7 @@ Push 到 `main` 时，仅源码、依赖、TypeScript 配置或 workflow 变更�
 
 配置值可以是上述 JSON 对象；需要保留注释或尾随逗号时，也可以使用包含完整 JSONC 文本的 JSON 字符串。真实配置和 Token 不要提交到 Git。
 
-一个 Job 分两个 inline shell 步骤执行：先处理可选的默认配对（`WRANGLER_CONFIG` 和 `CLOUDFLARE_API_TOKEN`），再部署两个集合中的条目。只显式读取这四个指定 Secret。缺少 Token、配置无效或部署失败时停止 workflow，之前成功的部署会保留；没有对应配置的 Token 会被忽略。
+同一个 Job 依次部署可选的默认配置、集合中的条目和可选的独立 SSH 配置。独立 SSH 部署使用 `WRANGLER_SSH_CONFIG` 保存完整 Wrangler 配置，使用 `CLOUDFLARE_SSH_API_TOKEN` 保存部署 Token。缺少 Token、配置无效或部署失败时停止 workflow，之前成功的部署会保留。没有对应配置的 Token 会被忽略。
 
 新增服务时，更新两个集合，再运行 **Actions → Deploy → Run workflow**，无需修改 workflow 或源码。修改 Secret 不会自动触发部署。删除条目只会停止后续部署，不会删除已存在的 Worker。
 

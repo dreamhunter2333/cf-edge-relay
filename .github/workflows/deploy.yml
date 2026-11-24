@@ -40,9 +40,10 @@ jobs:
       - name: Deploy default configuration
         shell: sh
         env:
+          DEPLOYMENT_LABEL: Default
           WRANGLER_CONFIG: ${{ secrets.WRANGLER_CONFIG }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
+        run: &deploy_single_configuration |
           set -eu
           [ -n "$WRANGLER_CONFIG" ] || exit 0
           : "${CLOUDFLARE_API_TOKEN:?Missing deployment token}"
@@ -53,10 +54,10 @@ jobs:
           unset WRANGLER_CONFIG
 
           if ! pnpm exec wrangler deploy >/dev/null 2>&1; then
-            printf '%s\n' '::error::Default deployment failed'
+            printf '::error::%s deployment failed\n' "$DEPLOYMENT_LABEL"
             exit 1
           fi
-          printf '%s\n' 'Default deployment succeeded'
+          printf '%s deployment succeeded\n' "$DEPLOYMENT_LABEL"
       - name: Deploy additional configurations
         shell: sh
         env:
@@ -102,6 +103,13 @@ jobs:
             fi
             printf 'Deployment succeeded (%s)\n' "$service"
           done
+      - name: Deploy SSH configuration
+        shell: sh
+        env:
+          DEPLOYMENT_LABEL: SSH
+          WRANGLER_CONFIG: ${{ secrets.WRANGLER_SSH_CONFIG }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SSH_API_TOKEN }}
+        run: *deploy_single_configuration
       - name: Remove deployment configuration
         if: always()
         run: rm -f wrangler.jsonc
